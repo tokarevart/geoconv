@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{self, Read, Write};
 use nalgebra as na;
-use fnv::FnvHashMap;
+use fnv::FnvBuildHasher;
 use by_addr::*;
 
 fn split2_inclusive(line: &str, pat: &str) -> Vec<String> {
@@ -46,37 +46,32 @@ pub struct OccFile(File);
 impl OccFile {
     pub fn create(path: &str) -> io::Result<Self> {
         let mut file = File::create(path)?;
-        writeln!(&mut file, "SetFactory(\"OpenCASCADE\");").unwrap();
+        writeln!(&mut file, "SetFactory(\"OpenCASCADE\");\nGeometry.OCCAutoFix = 0;").unwrap();
         Ok(OccFile(file))
     }
 
     fn write_point(&mut self, tag: u64, pos: &na::Point3<f64>) -> io::Result<()> {
-        writeln!(self.0, "p{}=newp;", tag)?;
-        writeln!(self.0, "Point(newp)={{{},{},{}}};", pos[0], pos[1], pos[2])?;
+        writeln!(self.0, "Point({})={{{},{},{}}};", tag, pos[0], pos[1], pos[2])?;
         Ok(())
     }
 
     fn write_line(&mut self, tag: u64, points: &[u64; 2]) -> io::Result<()> {
-        writeln!(self.0, "l{}=newl;", tag)?;
-        writeln!(self.0, "Line(newl)={{p{},p{}}};", points[0], points[1])?;
+        writeln!(self.0, "Line({})={{{},{}}};", tag, points[0], points[1])?;
         Ok(())
     }
 
     fn write_line_loop(&mut self, tag: u64, lines: &[i64]) -> io::Result<()> {
-        writeln!(self.0, "ll{}=newll;", tag)?;
-        writeln!(self.0, "Line Loop(newll)={{{}}};", 
-            lines.iter().map(|&x| format!("l{}", {
-                assert_ne!(x, std::i64::MIN);
-                x.abs()
-            })).collect::<Vec<_>>().join(","),
+        writeln!(self.0, "Line Loop({})={{{}}};", 
+            tag, 
+            lines.iter().map(|&x| x.to_string()).collect::<Vec<_>>().join(","),
         )?;
         Ok(())
     }
 
     fn write_surface(&mut self, tag: u64, lineloop: u64, isplane: bool) -> io::Result<()> {
-        writeln!(self.0, "s{}=news;", tag)?;
-        writeln!(self.0, "{}Surface(news)={{ll{}}};", 
-            if isplane { "Plane " } else { "" },
+        writeln!(self.0, "{}Surface({})={{{}}};",
+            if isplane { "Plane " } else { "" }, 
+            tag,
             lineloop,
         )?;
         Ok(())
@@ -84,25 +79,21 @@ impl OccFile {
 
     fn write_physical_surface(&mut self, tag: u64, surfaces: &[u64]) -> io::Result<()> {
         writeln!(self.0, "Physical Surface(\"ps{}\")={{{}}};", tag,
-            surfaces.iter().map(|x| format!("s{}", x)).collect::<Vec<_>>().join(","),
+            surfaces.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
         )?;
         Ok(())
     }
 
     fn write_surface_loop(&mut self, tag: u64, surfaces: &[i64]) -> io::Result<()> {
-        writeln!(self.0, "sl{}=newsl;", tag)?;
-        writeln!(self.0, "Surface Loop(newsl)={{{}}};", 
-            surfaces.iter().map(|&x| format!("s{}", {
-                assert_ne!(x, std::i64::MIN);
-                x.abs()
-            })).collect::<Vec<_>>().join(","),
+        writeln!(self.0, "Surface Loop({})={{{}}};",
+            tag, 
+            surfaces.iter().map(|&x| x.to_string()).collect::<Vec<_>>().join(","),
         )?;
         Ok(())
     }
 
     fn write_volume(&mut self, tag: u64, surfaceloop: u64) -> io::Result<()> {
-        writeln!(self.0, "v{}=newv;", tag)?;
-        writeln!(self.0, "Volume(newv)={{sl{}}};", surfaceloop)?;
+        writeln!(self.0, "Volume({})={{{}}};", tag, surfaceloop)?;
         Ok(())
     }
 
@@ -134,7 +125,7 @@ impl OccFile {
     }
 }
 
-type GeoHashMap = FnvHashMap<u64, ByAddr<Box<GeoElem>>>;
+type GeoHashMap = indexmap::IndexMap<u64, ByAddr<Box<GeoElem>>, FnvBuildHasher>;
 
 #[derive(Debug, Clone)]
 pub struct Geometry {
@@ -458,14 +449,14 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let file = GeoFile::open("tenspec-inner-reg.geo").unwrap();
+        let file = GeoFile::open("test.geo").unwrap();
         let mut geom = Geometry::from(file);
         geom.clear(GeoElemKind::PhysicalSurface);
         let stags: Vec<u64> = geom.tags(GeoElemKind::Surface).map(|x| *x).collect();
         for stag in stags {
             geom.correct_surface_flatness(stag).unwrap();
         }
-        let mut file = OccFile::create("tenspec.geo").unwrap();
+        let mut file = OccFile::create("test-occ.geo").unwrap();
         file.write_geometry(&geom).unwrap();
     }
 }

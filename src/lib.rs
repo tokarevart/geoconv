@@ -125,17 +125,17 @@ impl OccFile {
     }
 }
 
-type GeoHashMap = indexmap::IndexMap<u64, ByAddr<Box<GeoElem>>, FnvBuildHasher>;
+type GeoIdxMap = indexmap::IndexMap<u64, ByAddr<Box<GeoElem>>, FnvBuildHasher>;
 
 #[derive(Debug, Clone)]
 pub struct Geometry {
-    points: GeoHashMap,
-    lines: GeoHashMap,
-    lineloops: GeoHashMap,
-    surfaces: GeoHashMap,
-    physicalsurfaces: GeoHashMap,
-    surfaceloops: GeoHashMap,
-    volumes: GeoHashMap,
+    points: GeoIdxMap,
+    lines: GeoIdxMap,
+    lineloops: GeoIdxMap,
+    surfaces: GeoIdxMap,
+    physicalsurfaces: GeoIdxMap,
+    surfaceloops: GeoIdxMap,
+    volumes: GeoIdxMap,
 }
 
 impl Geometry {
@@ -152,23 +152,23 @@ impl Geometry {
     }
 
     pub fn is_empty(&self, kind: GeoElemKind) -> bool {
-        self.apply_to_hmap(kind, |hm: &GeoHashMap| hm.is_empty())
+        self.apply_to_hmap(kind, |hm: &GeoIdxMap| hm.is_empty())
     }
 
     pub fn clear(&mut self, kind: GeoElemKind) {
-        self.apply_to_hmap_mut(kind, |hm: &mut GeoHashMap| hm.clear())
+        self.apply_to_hmap_mut(kind, |hm: &mut GeoIdxMap| hm.clear())
     }
 
     pub fn tags(&self, kind: GeoElemKind) -> impl Iterator<Item=&u64> {
-        self.apply_to_hmap(kind, |hm: &GeoHashMap| hm.keys())
+        self.apply_to_hmap(kind, |hm: &GeoIdxMap| hm.keys())
     }
 
     pub fn elems(&self, kind: GeoElemKind) -> impl Iterator<Item=&GeoElem> {
-        self.apply_to_hmap(kind, |hm: &GeoHashMap| hm.values()).map(|x| &***x)
+        self.apply_to_hmap(kind, |hm: &GeoIdxMap| hm.values()).map(|x| &***x)
     }
 
     pub fn elems_mut(&mut self, kind: GeoElemKind) -> impl Iterator<Item=&mut GeoElem> {
-        self.apply_to_hmap_mut(kind, |hm: &mut GeoHashMap| hm.values_mut()).map(|x| &mut ***x)
+        self.apply_to_hmap_mut(kind, |hm: &mut GeoIdxMap| hm.values_mut()).map(|x| &mut ***x)
     }
 
     pub fn iter(&self, kind: GeoElemKind) -> impl Iterator<Item=(&u64, &GeoElem)> {
@@ -176,22 +176,22 @@ impl Geometry {
     }
 
     pub fn iter_mut(&mut self, kind: GeoElemKind) -> impl Iterator<Item=(&u64, &mut GeoElem)> {
-        self.apply_to_hmap_mut(kind, |hm: &mut GeoHashMap| hm.iter_mut()).map(|(k, v)| (k, &mut ***v))
+        self.apply_to_hmap_mut(kind, |hm: &mut GeoIdxMap| hm.iter_mut()).map(|(k, v)| (k, &mut ***v))
     }
 
     pub fn get(&self, tag: u64, kind: GeoElemKind) -> Option<&GeoElem> {
         assert_ne!(tag, 0);
-        self.apply_to_hmap(kind, |hm: &GeoHashMap| hm.get(&tag).map(|x| &*x.0))
+        self.apply_to_hmap(kind, |hm: &GeoIdxMap| hm.get(&tag).map(|x| &*x.0))
     }
 
     pub fn get_mut(&mut self, tag: u64, kind: GeoElemKind) -> Option<&mut GeoElem> {
         assert_ne!(tag, 0);
-        self.apply_to_hmap_mut(kind, |hm: &mut GeoHashMap| hm.get_mut(&tag).map(|x| &mut *x.0))
+        self.apply_to_hmap_mut(kind, |hm: &mut GeoIdxMap| hm.get_mut(&tag).map(|x| &mut *x.0))
     }
 
     pub fn insert(&mut self, tag: u64, elem: Box<GeoElem>) -> Option<Box<GeoElem>> {
         assert_ne!(tag, 0);
-        self.apply_to_hmap_mut(elem.kind(), |hm: &mut GeoHashMap| hm.insert(tag, ByAddr(elem)).map(|x| x.0))
+        self.apply_to_hmap_mut(elem.kind(), |hm: &mut GeoIdxMap| hm.insert(tag, ByAddr(elem)).map(|x| x.0))
     }
 
     pub fn insert_from_expr(&mut self, expr: &str) -> Option<Box<GeoElem>> {
@@ -201,10 +201,10 @@ impl Geometry {
 
     pub fn remove(&mut self, tag: u64, kind: GeoElemKind) -> Option<Box<GeoElem>> {
         assert_ne!(tag, 0);
-        self.apply_to_hmap_mut(kind, |hm: &mut GeoHashMap| hm.remove(&tag).map(|x| x.0))
+        self.apply_to_hmap_mut(kind, |hm: &mut GeoIdxMap| hm.remove(&tag).map(|x| x.0))
     }
 
-    fn apply_to_hmap<'a, R>(&'a self, kind: GeoElemKind, f: impl FnOnce(&'a GeoHashMap) -> R) -> R {
+    fn apply_to_hmap<'a, R>(&'a self, kind: GeoElemKind, f: impl FnOnce(&'a GeoIdxMap) -> R) -> R {
         match kind {
             GeoElemKind::Point           => f(&self.points),
             GeoElemKind::Line            => f(&self.lines),
@@ -216,7 +216,7 @@ impl Geometry {
         }
     }
 
-    fn apply_to_hmap_mut<'a, R>(&'a mut self, kind: GeoElemKind, f: impl FnOnce(&'a mut GeoHashMap) -> R) -> R {
+    fn apply_to_hmap_mut<'a, R>(&'a mut self, kind: GeoElemKind, f: impl FnOnce(&'a mut GeoIdxMap) -> R) -> R {
         match kind {
             GeoElemKind::Point           => f(&mut self.points),
             GeoElemKind::Line            => f(&mut self.lines),

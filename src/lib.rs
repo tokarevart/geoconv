@@ -87,7 +87,10 @@ impl OccFile {
     fn write_surface_loop(&mut self, tag: u64, surfaces: &[i64]) -> io::Result<()> {
         writeln!(self.0, "Surface Loop({})={{{}}};",
             tag, 
-            surfaces.iter().map(|&x| x.to_string()).collect::<Vec<_>>().join(","),
+            surfaces.iter().map(|&x| format!("{}", {
+                assert_ne!(x, std::i64::MIN);
+                x.abs()
+            })).collect::<Vec<_>>().join(","),
         )?;
         Ok(())
     }
